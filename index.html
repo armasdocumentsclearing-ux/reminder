@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remindly - Smart Edition</title>
+    <!-- Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0F172A;
+            color: #1e293b;
+            overflow-x: hidden;
+        }
+
+        /* --- Aurora Background --- */
+        .aurora-bg {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            z-index: -1;
+        }
+
+        .blob {
+            position: absolute;
+            filter: blur(100px);
+            border-radius: 50%;
+            opacity: 0.4;
+            animation: float 20s infinite alternate;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(50px, 50px) scale(1.1); }
+        }
+
+        .grid-overlay {
+            position: absolute;
+            inset: 0;
+            opacity: 0.05;
+            background-image: radial-gradient(#ffffff 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .noise-overlay {
+            position: absolute;
+            inset: 0;
+            opacity: 0.04;
+            pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* --- Smart Glass --- */
+        .glass {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.1);
+        }
+
+        /* --- Animations --- */
+        .modal-enter {
+            animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes zoomIn {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* --- PRINT ENGINE --- */
+        @media print {
+            @page { margin: 1.5cm; }
+            body { background: white !important; color: black !important; }
+            body * { visibility: hidden !important; }
+            #printContainer, #printContainer * { visibility: visible !important; }
+            
+            #printContainer {
+                display: block !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+                z-index: 9999;
+            }
+
+            .print-header {
+                margin-bottom: 30px;
+                border-bottom: 4px solid #7C3AED; /* Violet border */
+                padding-bottom: 10px;
+            }
+
+            .print-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                border: 2px solid #000 !important;
+                margin-top: 20px !important;
+            }
+
+            .print-table th, .print-table td {
+                border: 1px solid #000 !important;
+                padding: 12px !important;
+                text-align: left !important;
+                font-size: 10pt !important;
+                color: black !important;
+            }
+
+            .print-table th {
+                background-color: #f1f5f9 !important;
+                -webkit-print-color-adjust: exact;
+                font-weight: 800 !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.05em !important;
+            }
+
+            .no-print { display: none !important; }
+        }
+
+        #printContainer { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN SCREEN (Restored & Pre-filled) -->
+    <div id="loginView" class="fixed inset-0 z-[200] flex items-center justify-center bg-[#0F172A]">
+        <div class="absolute inset-0 overflow-hidden -z-10">
+            <div class="blob bg-violet-600/30 w-[60%] h-[60%] top-[-10%] left-[-10%]"></div>
+            <div class="blob bg-fuchsia-500/30 w-[40%] h-[40%] bottom-[-10%] right-[-10%]"></div>
+            <div class="grid-overlay"></div>
+            <div class="noise-overlay"></div>
+        </div>
+        
+        <div class="glass p-10 rounded-[3rem] text-center max-w-md w-full mx-4 border-white/20 shadow-2xl animate-[zoomIn_0.5s_ease-out]">
+            <div class="bg-gradient-to-tr from-violet-600 to-indigo-600 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-violet-500/20">
+                <i data-lucide="lock" class="text-white w-10 h-10"></i>
+            </div>
+            <h1 class="text-4xl font-black text-slate-900 mb-2">Remindly</h1>
+            <p class="text-slate-500 font-medium mb-8">Secure Workspace Access</p>
+            
+            <div class="space-y-3 mb-6 text-left">
+                <!-- Pre-filled Credentials -->
+                <input type="email" id="loginEmail" value="pro@tamleekpt.ae" placeholder="Email Address" class="w-full px-5 py-4 rounded-2xl bg-white/50 border border-white/50 text-slate-800 font-bold placeholder:text-slate-400 outline-none focus:bg-white focus:border-violet-300 transition-all">
+                <input type="password" id="loginPassword" value="0556291357" placeholder="Password" class="w-full px-5 py-4 rounded-2xl bg-white/50 border border-white/50 text-slate-800 font-bold placeholder:text-slate-400 outline-none focus:bg-white focus:border-violet-300 transition-all">
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <button onclick="handleSmartAuth()" class="w-full py-4 rounded-2xl bg-slate-900 text-white font-bold text-lg hover:bg-slate-800 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3 group">
+                    <span id="loginBtnText">Enter Workspace</span>
+                    <i data-lucide="arrow-right" class="w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
+                </button>
+            </div>
+            
+            <p id="loginError" class="text-rose-500 text-xs font-bold mt-4 hidden bg-rose-50 p-2 rounded-lg border border-rose-100"></p>
+        </div>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div id="mainAppView" class="relative min-h-screen hidden">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 max-w-6xl mx-auto px-4 md:px-8 pt-8 no-print">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="bg-gradient-to-tr from-violet-600 to-indigo-600 p-2.5 rounded-2xl shadow-xl shadow-violet-200/50">
+                        <i data-lucide="star" class="text-white fill-white w-6 h-6"></i>
+                    </div>
+                    <h1 class="text-3xl md:text-4xl font-black tracking-tight text-slate-900">Remindly</h1>
+                    <span class="bg-white/80 backdrop-blur-sm text-violet-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-violet-100">Smart UI</span>
+                </div>
+                <p class="text-slate-500 font-semibold text-sm">Experience intelligence in every reminder.</p>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <button id="viewToggleBtn" onclick="toggleView()" class="flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black text-sm transition-all border bg-white/60 backdrop-blur-md border-white/50 text-slate-700 hover:border-violet-300">
+                    <span id="viewToggleIcon"><i data-lucide="bar-chart-3" class="w-4 h-4"></i></span>
+                    <span id="viewToggleText">Analytics</span>
+                </button>
+                <button onclick="openModal()" class="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-8 py-3.5 rounded-2xl font-black text-sm flex items-center gap-2 transition-all shadow-xl shadow-violet-200/50 active:scale-95">
+                    <i data-lucide="plus" class="w-5 h-5"></i>
+                    New Goal
+                </button>
+                <button onclick="handleLogout()" class="bg-white/60 backdrop-blur-md border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-3.5 rounded-2xl transition-all shadow-sm group" title="Log Out">
+                    <i data-lucide="log-out" class="w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- DASHBOARD VIEW -->
+        <div id="dashboardView" class="max-w-6xl mx-auto px-4 md:px-8 pb-24 no-print">
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+                <div class="glass p-6 rounded-[2.5rem] flex items-center gap-5 hover:scale-[1.02] transition-transform">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center shadow-lg"><i data-lucide="clock" class="text-white"></i></div>
+                    <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Active</p><p id="statActive" class="text-3xl font-black text-slate-900">0</p></div>
+                </div>
+                <div class="glass p-6 rounded-[2.5rem] flex items-center gap-5 hover:scale-[1.02] transition-transform">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center shadow-lg"><i data-lucide="alert-circle" class="text-white"></i></div>
+                    <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Pending</p><p id="statPending" class="text-3xl font-black text-slate-900">0</p></div>
+                </div>
+                <div class="glass p-6 rounded-[2.5rem] flex items-center gap-5 hover:scale-[1.02] transition-transform">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg"><i data-lucide="check-circle" class="text-white"></i></div>
+                    <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Success</p><p id="statCompleted" class="text-3xl font-black text-slate-900">0</p></div>
+                </div>
+                <div class="glass p-6 rounded-[2.5rem] flex items-center gap-5 hover:scale-[1.02] transition-transform">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg"><i data-lucide="layers" class="text-white"></i></div>
+                    <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Total</p><p id="statTotal" class="text-3xl font-black text-slate-900">0</p></div>
+                </div>
+            </div>
+
+            <!-- Search & Filters -->
+            <div class="flex flex-col lg:flex-row gap-4 mb-8">
+                <div class="flex-1 flex gap-3">
+                    <div class="relative flex-1">
+                        <i data-lucide="search" class="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5"></i>
+                        <input id="searchInput" oninput="handleSearch(this.value)" type="text" placeholder="Filter objectives..." class="w-full pl-14 pr-6 py-4 rounded-[1.8rem] border-2 border-transparent bg-white/60 backdrop-blur-md shadow-sm focus:outline-none focus:border-violet-500 transition-all font-bold text-slate-700 placeholder:text-slate-400">
+                    </div>
+                    <button onclick="resetFilters()" class="px-5 rounded-[1.8rem] bg-white/60 backdrop-blur-md shadow-sm border-2 border-transparent hover:bg-rose-50 hover:border-rose-100 hover:text-rose-500 text-slate-400 transition-all flex items-center justify-center group" title="Reset Filters">
+                        <i data-lucide="rotate-ccw" class="w-5 h-5 group-hover:-rotate-90 transition-transform"></i>
+                    </button>
+                </div>
+                <div class="flex bg-white/40 backdrop-blur-md p-1.5 rounded-[1.8rem] border border-white/60 overflow-x-auto no-scrollbar shadow-sm">
+                    <button onclick="setFilter('all')" id="filterAll" class="filter-btn px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-violet-600 text-white shadow-lg transition-all">All</button>
+                    <button onclick="setFilter('pending')" id="filterPending" class="filter-btn px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-white/50 transition-all">Pending</button>
+                    <button onclick="setFilter('completed')" id="filterCompleted" class="filter-btn px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-white/50 transition-all">Done</button>
+                </div>
+            </div>
+
+            <!-- Cards Grid (Now List) -->
+            <div id="remindersList" class="flex flex-col gap-4">
+                <!-- Javascript Renders Items Here -->
+            </div>
+        </div>
+
+        <!-- ANALYTICS VIEW -->
+        <div id="analyticsView" class="hidden max-w-6xl mx-auto px-4 md:px-8 pb-24">
+            <div class="glass rounded-[3.5rem] shadow-2xl p-8 md:p-14 border-white/60">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-8">
+                    <div>
+                        <h2 class="text-3xl font-black text-slate-900 mb-2 tracking-tight">System Intelligence</h2>
+                        <p class="text-slate-500 font-semibold text-sm">Deep dive into your project velocity</p>
+                    </div>
+                    <div class="flex gap-3 w-full lg:w-auto">
+                        <button onclick="exportToExcel()" class="flex-1 lg:flex-none flex items-center justify-center gap-2 px-8 py-4 bg-emerald-500 text-white font-black rounded-2xl shadow-xl active:scale-95 text-xs uppercase tracking-widest hover:bg-emerald-600 transition-colors">
+                            <i data-lucide="table" class="w-4 h-4"></i> Export Excel
+                        </button>
+                        <button onclick="printFullReport()" class="flex-1 lg:flex-none flex items-center justify-center gap-2 px-8 py-4 bg-violet-600 text-white font-black rounded-2xl shadow-xl active:scale-95 text-xs uppercase tracking-widest hover:bg-violet-700 transition-colors">
+                            <i data-lucide="file-text" class="w-4 h-4"></i> Export PDF
+                        </button>
+                    </div>
+                </div>
+
+                <!-- DATE FILTER SECTION -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 bg-white/40 p-6 rounded-[2rem] border border-white/50">
+                    <div>
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">From Date</label>
+                        <input type="date" id="analyticsStartDate" class="w-full px-4 py-3 rounded-2xl bg-white/70 border border-white/60 text-xs font-bold focus:outline-none focus:border-violet-500 transition-all text-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">To Date</label>
+                        <input type="date" id="analyticsEndDate" class="w-full px-4 py-3 rounded-2xl bg-white/70 border border-white/60 text-xs font-bold focus:outline-none focus:border-violet-500 transition-all text-slate-700">
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <button onclick="applyAnalyticsFilter()" class="flex-1 px-4 py-3 rounded-2xl bg-violet-600 text-white text-xs font-black uppercase tracking-widest hover:bg-violet-700 transition-all flex items-center justify-center gap-2">
+                            <i data-lucide="filter" class="w-4 h-4"></i> Apply
+                        </button>
+                        <button onclick="resetAnalyticsFilter()" class="px-4 py-3 rounded-2xl bg-slate-200 text-slate-600 text-xs font-black uppercase tracking-widest hover:bg-slate-300 transition-all flex items-center justify-center" title="Reset Analytics">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 border-b border-slate-100">
+                                <th class="pb-6 px-4">Subject</th>
+                                <th class="pb-6 px-4">Stream</th>
+                                <th class="pb-6 px-4 text-center">Intensity</th>
+                                <th class="pb-6 px-4">Timeline</th>
+                                <th class="pb-6 px-4 text-right">Outcome</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analyticsBody" class="divide-y divide-slate-50">
+                            <!-- Rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Aurora Background -->
+        <div class="aurora-bg no-print -z-10">
+            <div class="blob bg-violet-600 w-[60%] h-[60%] top-[-10%] left-[-10%]"></div>
+            <div class="blob bg-blue-500 w-[50%] h-[50%] top-[10%] right-[-10%]" style="animation-delay: -5s;"></div>
+            <div class="blob bg-fuchsia-500 w-[40%] h-[40%] bottom-[-10%] left-[20%]" style="animation-delay: -10s;"></div>
+            <div class="grid-overlay"></div>
+            <div class="absolute inset-0 bg-gradient-to-b from-[#F8FAFF] via-[#F8FAFF]/90 to-[#F8FAFF]"></div>
+            <div class="noise-overlay"></div>
+        </div>
+    </div>
+
+    <!-- Print Output Layer -->
+    <div id="printContainer"></div>
+
+    <!-- Toast Notifications -->
+    <div id="toastLayer" class="fixed top-6 right-6 z-[120] flex flex-col gap-3 pointer-events-none no-print"></div>
+
+    <!-- MAIN MODAL (Add/Edit) -->
+    <div id="taskModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-2xl z-[110] hidden flex items-center justify-center p-4 overflow-y-auto" onclick="closeModal()">
+        <div class="bg-white w-full max-w-4xl rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row border border-white modal-enter my-auto" onclick="event.stopPropagation()">
+            <!-- Sidebar -->
+            <div class="md:w-[35%] bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] p-12 text-white relative flex flex-col justify-between">
+                <div class="relative z-10">
+                    <div class="bg-white/20 backdrop-blur-xl w-16 h-16 rounded-[1.8rem] flex items-center justify-center mb-10 shadow-lg border border-white/20">
+                        <i data-lucide="zap" class="w-8 h-8"></i>
+                    </div>
+                    <h2 id="modalTitle" class="text-4xl font-black tracking-tighter leading-none mb-6">Capture Pulse</h2>
+                    <p class="text-violet-100 font-semibold text-sm leading-relaxed opacity-80">Synchronize your goals with precision.</p>
+                </div>
+            </div>
+            <!-- Form -->
+            <div class="flex-1 p-10 md:p-14 bg-[#FDFEFF] relative">
+                <button onclick="closeModal()" class="absolute top-8 right-10 p-3 bg-slate-100 text-slate-400 hover:text-rose-600 rounded-2xl transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+                
+                <div class="space-y-8 mt-6">
+                    <div class="space-y-2">
+                        <label class="block text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Subject Objective</label>
+                        <input id="formTitle" type="text" placeholder="Enter objective..." class="w-full px-0 py-4 border-b-2 border-slate-100 focus:border-violet-500 focus:outline-none bg-transparent font-black text-2xl md:text-3xl placeholder:text-slate-200 transition-all">
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <label class="block text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Contextual Details</label>
+                        <textarea id="formDesc" rows="2" class="w-full px-6 py-5 rounded-[1.8rem] bg-slate-50 border-2 border-transparent focus:border-violet-100 outline-none font-bold text-slate-600 text-sm resize-none"></textarea>
+                    </div>
+
+                    <!-- ATTACHMENTS SECTION -->
+                    <div class="space-y-3">
+                        <label class="block text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Reference Assets</label>
+                        <div id="modalAttachmentList" class="flex flex-wrap gap-3 min-h-[40px]">
+                            <!-- Attachments rendered here -->
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <button onclick="document.getElementById('fileInput').click()" type="button" class="flex items-center gap-2 px-4 py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl text-xs font-bold text-slate-500 hover:text-violet-600 hover:border-violet-300 transition-all">
+                                <i data-lucide="paperclip" class="w-4 h-4"></i> Attach File
+                            </button>
+                            <button onclick="addLinkAttachment()" type="button" class="flex items-center gap-2 px-4 py-3 bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-2xl text-xs font-bold text-indigo-500 hover:text-indigo-700 hover:border-indigo-400 transition-all">
+                                <i data-lucide="link" class="w-4 h-4"></i> Add Link
+                            </button>
+                            <input type="file" id="fileInput" multiple class="hidden" onchange="handleFileSelect(this)">
+                        </div>
+                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest pl-1">Max 5MB per file • Unlimited Links</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label class="block text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Scheduled</label>
+                            <input id="formTime" type="datetime-local" class="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent font-black text-xs outline-none focus:bg-white focus:border-violet-200 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Priority</label>
+                            <select id="formPriority" class="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent font-black text-xs outline-none focus:bg-white focus:border-violet-200 transition-all cursor-pointer">
+                                <option value="low">Low Intensity</option>
+                                <option value="medium">Medium Intensity</option>
+                                <option value="high">High Intensity</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- ALERT OPTIONS -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label class="block text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Alert Me Before</label>
+                            <div class="flex items-center gap-3 bg-slate-50 border-2 border-transparent focus-within:border-violet-200 rounded-2xl px-4 py-3 transition-all">
+                                <i data-lucide="bell-ring" class="w-5 h-5 text-violet-500"></i>
+                                <input type="number" id="formAlertDays" min="0" max="365" class="bg-transparent font-bold text-slate-700 text-sm outline-none w-full" placeholder="Days (e.g. 10, 180, 270)">
+                                <span class="text-xs font-bold text-slate-400 whitespace-nowrap">Days</span>
+                            </div>
+                        </div>
+                        <!-- WHATSAPP OPTION -->
+                        <div>
+                            <label class="block text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">WhatsApp Alert</label>
+                            <div class="flex items-center gap-3 bg-slate-50 border-2 border-transparent focus-within:border-emerald-200 rounded-2xl px-4 py-3 transition-all">
+                                <i data-lucide="message-circle" class="w-5 h-5 text-emerald-500"></i>
+                                <input type="text" id="formWhatsapp" class="bg-transparent font-bold text-slate-700 text-sm outline-none w-full" placeholder="Phone (e.g. 15551234567)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <label class="block text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Stream</label>
+                        <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                            <button type="button" onclick="setFormCategory('Work')" class="cat-btn flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase border-2 border-transparent bg-violet-50 text-violet-600 hover:bg-violet-100 transition-all">Work</button>
+                            <button type="button" onclick="setFormCategory('Personal')" class="cat-btn flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase border-2 border-transparent bg-sky-50 text-sky-600 hover:bg-sky-100 transition-all">Personal</button>
+                            <button type="button" onclick="setFormCategory('Health')" class="cat-btn flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase border-2 border-transparent bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all">Health</button>
+                            <button type="button" onclick="setFormCategory('Finance')" class="cat-btn flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase border-2 border-transparent bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all">Finance</button>
+                        </div>
+                    </div>
+
+                    <button onclick="saveTask()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.3em] shadow-2xl shadow-violet-200 transition-all active:scale-[0.98] text-[11px] hover:shadow-violet-400/50">
+                        Deploy Objective
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RENEW MODAL -->
+    <div id="renewModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[120] hidden flex items-center justify-center p-6" onclick="closeRenewModal()">
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 border border-white modal-enter" onclick="event.stopPropagation()">
+            <div class="bg-emerald-100 w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-6 text-emerald-600">
+                <i data-lucide="refresh-cw" class="w-8 h-8"></i>
+            </div>
+            <h2 class="text-2xl font-black text-slate-900 mb-2">Reschedule</h2>
+            <p class="text-slate-500 text-xs font-bold uppercase tracking-widest mb-6">Select new execution time</p>
+            <input id="renewTime" type="datetime-local" class="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent font-black text-xs outline-none focus:bg-white focus:border-emerald-400 mb-6">
+            <div class="flex gap-3">
+                <button onclick="closeRenewModal()" class="flex-1 py-3 rounded-xl font-bold text-slate-400 hover:bg-slate-50">Cancel</button>
+                <button onclick="saveRenew()" class="flex-[2] py-3 rounded-xl bg-emerald-500 text-white font-black uppercase text-xs shadow-lg shadow-emerald-200">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged, 
+            signOut,
+            signInWithEmailAndPassword,
+            createUserWithEmailAndPassword 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        /*
+         * --- FIRESTORE SECURITY RULES ---
+         * match /databases/{database}/documents {
+         * match /artifacts/{appId}/users/{userId}/data/{document} {
+         * allow read, write: if request.auth != null && request.auth.uid == userId;
+         * }
+         * }
+         */
+
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyD578Duqdxe-4qZqq4eDg88_DgOyQvTneE",
+            authDomain: "project3-e7cdd.firebaseapp.com",
+            projectId: "project3-e7cdd",
+            storageBucket: "project3-e7cdd.firebasestorage.app",
+            messagingSenderId: "226589009849",
+            appId: "1:226589009849:web:65319e881676f9073c7868"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // Environment Variables
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Global State
+        let reminders = [];
+        let currentView = 'dashboard';
+        let searchQuery = '';
+        let filterStatus = 'all';
+        let editingId = null;
+        let renewId = null;
+        let selectedCategory = 'Work';
+        let tempAttachments = []; 
+        let analyticsFilter = { start: null, end: null };
+        let currentUser = null;
+        let unsubscribe = null; // Firestore listener
+
+        // --- Authentication & Data Subscription ---
+        
+        // 1. Check for Environment Token on Load (Auto-Login override)
+        const initAuth = async () => {
+            if (initialAuthToken) {
+                try {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } catch (error) {
+                    console.warn("Environment token auth failed:", error);
+                }
+            }
+        };
+        initAuth();
+
+        // 2. Auth State Listener (Controls UI visibility)
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                toggleScreens('main');
+                setupRealtimeListener(user.uid);
+            } else {
+                currentUser = null;
+                toggleScreens('login');
+                if (unsubscribe) unsubscribe();
+                reminders = [];
+            }
+        });
+
+        // 3. Smart User Action (Auto Login or Register)
+        window.handleSmartAuth = async () => {
+            const btnText = document.getElementById('loginBtnText');
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorMsg = document.getElementById('loginError');
+            
+            errorMsg.classList.add('hidden');
+            if(!email || !password) {
+                 errorMsg.innerText = "Please enter email & password.";
+                 errorMsg.classList.remove('hidden');
+                 return;
+            }
+
+            btnText.innerText = "Verifying...";
+            
+            try {
+                // Attempt 1: Try to Login
+                await signInWithEmailAndPassword(auth, email, password);
+                // Success - onAuthStateChanged handles the rest
+            } catch (loginError) {
+                console.log("Login failed, attempting registration...", loginError.code);
+                
+                // If login fails (user doesn't exist), try to Register
+                if (loginError.code === 'auth/user-not-found' || loginError.code === 'auth/invalid-credential') {
+                    try {
+                        btnText.innerText = "Creating Account...";
+                        await createUserWithEmailAndPassword(auth, email, password);
+                        // Success - Account created and logged in
+                        notify("Welcome! Account Created");
+                    } catch (regError) {
+                        console.error("Registration failed:", regError);
+                        
+                        // Handle Registration Errors
+                        let msg = "Authentication failed.";
+                        if (regError.code === 'auth/email-already-in-use') {
+                            // This means User Exists BUT Password was wrong in Step 1
+                            msg = "Incorrect Password."; 
+                        } else if (regError.code === 'auth/weak-password') {
+                            msg = "Password too weak (min 6 chars).";
+                        } else {
+                            msg = regError.message.replace('Firebase: ', '');
+                        }
+                        
+                        errorMsg.innerText = msg;
+                        errorMsg.classList.remove('hidden');
+                        btnText.innerText = "Enter Workspace";
+                    }
+                } else {
+                    // Handle other Login Errors (e.g. wrong password for existing account if API returns specific code)
+                    let msg = loginError.message;
+                    if (loginError.code === 'auth/wrong-password') msg = "Incorrect Password.";
+                    else if (loginError.code === 'auth/invalid-email') msg = "Invalid Email Format.";
+                    else if (loginError.code === 'auth/too-many-requests') msg = "Too many attempts. Try later.";
+                    
+                    errorMsg.innerText = msg;
+                    errorMsg.classList.remove('hidden');
+                    btnText.innerText = "Enter Workspace";
+                }
+            }
+        };
+
+        window.handleLogout = async () => {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Sign Out Error", error);
+            }
+        };
+
+        function toggleScreens(view) {
+            const login = document.getElementById('loginView');
+            const main = document.getElementById('mainAppView');
+            
+            if (view === 'login') {
+                login.classList.remove('hidden'); // Show Login
+                login.classList.add('flex'); // Ensure flex layout
+                
+                main.classList.add('hidden'); // Hide App
+                
+                // Reset button state
+                document.getElementById('loginBtnText').innerText = "Enter Workspace";
+            } else {
+                login.classList.add('hidden'); // Hide Login
+                login.classList.remove('flex'); 
+                
+                main.classList.remove('hidden'); // Show App
+                lucide.createIcons();
+            }
+        }
+
+        function setupRealtimeListener(userId) {
+            if (unsubscribe) unsubscribe(); // Unsubscribe previous listener if any
+
+            // Path: /artifacts/{appId}/users/{userId}/data
+            const collRef = collection(db, 'artifacts', appId, 'users', userId, 'data');
+
+            unsubscribe = onSnapshot(collRef, (snapshot) => {
+                reminders = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                // Sort by time
+                reminders.sort((a, b) => new Date(a.time) - new Date(b.time));
+                render();
+                checkUpcomingReminders();
+            }, (error) => {
+                console.error("Data Fetch Error:", error);
+                notify("Sync Error");
+            });
+        }
+
+        // --- Notification System ---
+        function notify(msg) {
+            const layer = document.getElementById('toastLayer');
+            const toast = document.createElement('div');
+            toast.className = 'bg-slate-900/90 backdrop-blur-xl text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-white/10 pointer-events-auto transform translate-x-full transition-all duration-300';
+            toast.innerHTML = `<div class="bg-violet-500 p-2 rounded-xl"><i data-lucide="zap" class="w-4 h-4 text-white fill-white"></i></div><span class="font-bold text-sm">${msg}</span>`;
+            layer.appendChild(toast);
+            
+            requestAnimationFrame(() => toast.classList.remove('translate-x-full'));
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // --- UI Logic ---
+        window.toggleView = function() {
+            currentView = currentView === 'dashboard' ? 'analytics' : 'dashboard';
+            
+            const dashboard = document.getElementById('dashboardView');
+            const analytics = document.getElementById('analyticsView');
+            const btnText = document.getElementById('viewToggleText');
+            const btnIcon = document.getElementById('viewToggleIcon');
+
+            if (currentView === 'analytics') {
+                dashboard.classList.add('hidden');
+                analytics.classList.remove('hidden');
+                btnText.innerText = 'Dashboard';
+                btnIcon.innerHTML = '<i data-lucide="layout-grid" class="w-4 h-4"></i>';
+            } else {
+                dashboard.classList.remove('hidden');
+                analytics.classList.add('hidden');
+                btnText.innerText = 'Analytics';
+                btnIcon.innerHTML = '<i data-lucide="bar-chart-3" class="w-4 h-4"></i>';
+            }
+            lucide.createIcons();
+        }
+
+        window.setFilter = function(status) {
+            filterStatus = status;
+            ['all', 'pending', 'completed'].forEach(s => {
+                const btn = document.getElementById(`filter${s.charAt(0).toUpperCase() + s.slice(1)}`);
+                if (s === status) {
+                    btn.className = "filter-btn px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-violet-600 text-white shadow-lg transition-all";
+                } else {
+                    btn.className = "filter-btn px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-white/50 transition-all";
+                }
+            });
+            render();
+        }
+
+        window.handleSearch = function(val) {
+            searchQuery = val.toLowerCase();
+            render();
+        }
+
+        window.resetFilters = function() {
+            searchQuery = '';
+            document.getElementById('searchInput').value = '';
+            window.setFilter('all'); 
+            notify("Filters Reset");
+        }
+
+        // --- Analytics Filter Logic ---
+        window.applyAnalyticsFilter = function() {
+            const start = document.getElementById('analyticsStartDate').value;
+            const end = document.getElementById('analyticsEndDate').value;
+            
+            analyticsFilter.start = start ? new Date(start).setHours(0,0,0,0) : null;
+            analyticsFilter.end = end ? new Date(end).setHours(23,59,59,999) : null;
+            
+            render();
+            notify("Filters Applied");
+        }
+
+        window.resetAnalyticsFilter = function() {
+            document.getElementById('analyticsStartDate').value = '';
+            document.getElementById('analyticsEndDate').value = '';
+            analyticsFilter = { start: null, end: null };
+            render();
+            notify("Analytics Reset");
+        }
+
+        function getAnalyticsData() {
+            return reminders.filter(r => {
+                if (!analyticsFilter.start && !analyticsFilter.end) return true;
+                const taskDate = new Date(r.time).getTime();
+                if (analyticsFilter.start && taskDate < analyticsFilter.start) return false;
+                if (analyticsFilter.end && taskDate > analyticsFilter.end) return false;
+                return true;
+            });
+        }
+
+        // --- Attachment Logic ---
+        window.handleFileSelect = function(input) {
+            const files = Array.from(input.files);
+            files.forEach(file => {
+                if (file.size > 5000000) {
+                    notify(`Skipped ${file.name} (Too Large > 5MB)`);
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    tempAttachments.push({
+                        id: Date.now() + Math.random().toString(16).slice(2),
+                        name: file.name,
+                        type: file.type || 'file',
+                        data: e.target.result
+                    });
+                    renderModalAttachments();
+                };
+                reader.readAsDataURL(file);
+            });
+            input.value = '';
+        }
+
+        window.addLinkAttachment = function() {
+            const url = prompt("Enter URL (e.g., https://google.com):");
+            if (!url) return;
+            const validUrl = url.startsWith('http') ? url : `https://${url}`;
+            const name = prompt("Enter a name for this link:", "External Resource");
+            
+            tempAttachments.push({
+                id: Date.now() + Math.random().toString(16).slice(2),
+                name: name || "Link",
+                type: 'link',
+                data: validUrl
+            });
+            renderModalAttachments();
+        }
+
+        function renderModalAttachments() {
+            const container = document.getElementById('modalAttachmentList');
+            container.innerHTML = tempAttachments.map(att => {
+                const isLink = att.type === 'link';
+                return `
+                <div class="flex items-center gap-2 ${isLink ? 'bg-indigo-50 border-indigo-100 text-indigo-700' : 'bg-violet-50 border-violet-100 text-violet-700'} border px-3 py-2 rounded-xl text-xs font-bold animate-[zoomIn_0.2s_ease-out]">
+                    <i data-lucide="${isLink ? 'link' : 'file'}" class="w-3 h-3"></i>
+                    <span class="truncate max-w-[120px]">${att.name}</span>
+                    <div class="flex gap-1 ml-2 border-l ${isLink ? 'border-indigo-200' : 'border-violet-200'} pl-2">
+                        <button onclick="viewAttachment('${att.id}', true)" class="${isLink ? 'text-indigo-400 hover:text-indigo-600' : 'text-violet-400 hover:text-violet-600'}"><i data-lucide="${isLink ? 'external-link' : 'eye'}" class="w-3 h-3"></i></button>
+                        ${!isLink ? `<a href="${att.data}" download="${att.name}" class="text-violet-400 hover:text-emerald-500"><i data-lucide="download" class="w-3 h-3"></i></a>` : ''}
+                        <button onclick="deleteModalAttachment('${att.id}')" class="${isLink ? 'text-indigo-400 hover:text-rose-500' : 'text-violet-400 hover:text-rose-500'}"><i data-lucide="x" class="w-3 h-3"></i></button>
+                    </div>
+                </div>
+            `}).join('');
+            lucide.createIcons();
+        }
+
+        window.deleteModalAttachment = function(id) {
+            if (confirm("Are you sure you want to remove this attachment?")) {
+                tempAttachments = tempAttachments.filter(a => a.id !== id);
+                renderModalAttachments();
+            }
+        }
+
+        window.viewAttachment = function(id, isTemp = false) {
+            const list = isTemp ? tempAttachments : reminders.flatMap(r => r.attachments || []);
+            const att = list.find(a => a.id === id);
+            if (att) {
+                if (att.type === 'link') {
+                    window.open(att.data, '_blank');
+                } else {
+                    const win = window.open();
+                    win.document.write(
+                        att.type.startsWith('image/') 
+                        ? `<img src="${att.data}" style="max-width:100%">`
+                        : `<iframe src="${att.data}" style="width:100%;height:100%;border:none;"></iframe>`
+                    );
+                }
+            }
+        }
+
+        // --- CRUD Operations (Firestore) ---
+        window.toggleComplete = async function(id) {
+            if (!currentUser) return;
+            const r = reminders.find(x => x.id === id);
+            if (!r) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'data', id);
+                await updateDoc(docRef, { completed: !r.completed });
+                notify(r.completed ? 'Objective Reopened' : 'Objective Completed');
+            } catch (e) {
+                console.error(e);
+                notify("Update Failed");
+            }
+        }
+
+        window.deleteTask = async function(id) {
+            if (!currentUser) return;
+            if (confirm("Are you sure you want to delete this objective? This action cannot be undone.")) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'data', id);
+                    await deleteDoc(docRef);
+                    notify("Objective Removed");
+                } catch (e) {
+                    console.error(e);
+                    notify("Delete Failed");
+                }
+            }
+        }
+
+        window.openModal = function(id = null) {
+            editingId = id;
+            document.getElementById('taskModal').classList.remove('hidden');
+            
+            if (id) {
+                const r = reminders.find(x => x.id === id);
+                document.getElementById('modalTitle').innerText = "Iterate Concept";
+                document.getElementById('formTitle').value = r.title;
+                document.getElementById('formDesc').value = r.description;
+                document.getElementById('formTime').value = r.time.slice(0, 16);
+                document.getElementById('formPriority').value = r.priority;
+                document.getElementById('formAlertDays').value = r.alertDays || '';
+                document.getElementById('formWhatsapp').value = r.whatsapp || '';
+                selectedCategory = r.category;
+                tempAttachments = [...(r.attachments || [])];
+            } else {
+                document.getElementById('modalTitle').innerText = "Capture Pulse";
+                document.getElementById('formTitle').value = '';
+                document.getElementById('formDesc').value = '';
+                const now = new Date();
+                const offset = now.getTimezoneOffset() * 60000;
+                document.getElementById('formTime').value = (new Date(now - offset)).toISOString().slice(0, 16);
+                document.getElementById('formPriority').value = 'medium';
+                document.getElementById('formAlertDays').value = ''; 
+                document.getElementById('formWhatsapp').value = '';
+                selectedCategory = 'Work';
+                tempAttachments = []; 
+            }
+            updateCategoryUI();
+            renderModalAttachments();
+        }
+
+        window.closeModal = function() {
+            document.getElementById('taskModal').classList.add('hidden');
+        }
+
+        window.setFormCategory = function(cat) {
+            selectedCategory = cat;
+            updateCategoryUI();
+        }
+
+        function updateCategoryUI() {
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                if (btn.innerText === selectedCategory.toUpperCase() || btn.innerText === selectedCategory) {
+                    btn.classList.add('ring-2', 'ring-violet-400', 'ring-offset-2');
+                } else {
+                    btn.classList.remove('ring-2', 'ring-violet-400', 'ring-offset-2');
+                }
+            });
+        }
+
+        window.saveTask = async function() {
+            if (!currentUser) return notify("Auth Required");
+            const title = document.getElementById('formTitle').value;
+            const time = document.getElementById('formTime').value;
+            
+            if (!title || !time) return notify("Missing Critical Data");
+
+            const data = {
+                title,
+                description: document.getElementById('formDesc').value,
+                time: new Date(time).toISOString(),
+                priority: document.getElementById('formPriority').value,
+                category: selectedCategory,
+                attachments: tempAttachments,
+                alertDays: parseInt(document.getElementById('formAlertDays').value) || 0,
+                whatsapp: document.getElementById('formWhatsapp').value,
+                completed: false, // Default for new, overwritten for edit if needed but usually separate toggle
+                createdAt: new Date().toISOString() // Or keep original
+            };
+
+            try {
+                if (editingId) {
+                    // Update existing
+                    delete data.createdAt; // Don't update creation time
+                    delete data.completed; // Don't reset completion on edit
+                    const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'data', editingId);
+                    await updateDoc(docRef, data);
+                    notify("Changes Committed");
+                } else {
+                    // Create new
+                    const collRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'data');
+                    await addDoc(collRef, data);
+                    notify("Objective Deployed");
+                }
+                closeModal();
+            } catch (e) {
+                console.error(e);
+                notify("Save Failed");
+            }
+        }
+
+        // --- Renew Feature ---
+        window.openRenewModal = function(id) {
+            renewId = id;
+            document.getElementById('renewModal').classList.remove('hidden');
+            const now = new Date();
+            const offset = now.getTimezoneOffset() * 60000;
+            document.getElementById('renewTime').value = (new Date(now - offset)).toISOString().slice(0, 16);
+        }
+
+        window.closeRenewModal = function() {
+            document.getElementById('renewModal').classList.add('hidden');
+            renewId = null;
+        }
+
+        window.saveRenew = async function() {
+            if (!currentUser) return;
+            const time = document.getElementById('renewTime').value;
+            if(!time) return;
+            
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'data', renewId);
+                await updateDoc(docRef, { 
+                    time: new Date(time).toISOString(), 
+                    completed: false 
+                });
+                notify("Timeline Updated");
+                closeRenewModal();
+            } catch (e) {
+                console.error(e);
+                notify("Renew Failed");
+            }
+        }
+
+        window.sendWhatsapp = function(id) {
+            // Fix: Use loose equality (==) to handle string/number ID mismatch
+            const r = reminders.find(x => x.id == id);
+            
+            if (!r) return notify("Error: Task not found");
+            
+            // Fallback if number is missing/invalid in object
+            let phone = r.whatsapp;
+            if (!phone) {
+                notify("No WhatsApp number saved for this task");
+                return;
+            }
+
+            // Clean number (remove + - ( ) spaces)
+            const cleanNum = phone.replace(/[^0-9]/g, '');
+            if (cleanNum.length < 6) return notify("Invalid Phone Number");
+
+            const text = encodeURIComponent(`*Reminder: ${r.title}*\n\n${r.description || 'No details provided.'}\n\nDue: ${new Date(r.time).toLocaleString()}`);
+            const url = `https://wa.me/${cleanNum}?text=${text}`;
+            
+            // Open in new tab
+            window.open(url, '_blank');
+        }
+
+        window.exportToExcel = function() {
+            const dataToExport = getAnalyticsData();
+            const headers = ["ID", "Objective", "Category", "Priority", "Scheduled Time", "Description", "Status", "Created At"];
+            const rows = dataToExport.map(r => [
+                r.id,
+                `"${(r.title || "").replace(/"/g, '""')}"`, 
+                r.category,
+                r.priority,
+                new Date(r.time).toLocaleString(),
+                `"${(r.description || "").replace(/"/g, '""')}"`,
+                r.completed ? "Completed" : "Pending",
+                new Date(r.createdAt).toLocaleString()
+            ]);
+            const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `remindly_data_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            notify("Excel (CSV) Downloaded");
+        }
+
+        window.printSingle = function(id) {
+            const r = reminders.find(x => x.id === id);
+            const container = document.getElementById('printContainer');
+            
+            const attachmentsList = r.attachments && r.attachments.length > 0 
+                ? r.attachments.map(a => `${a.name} (${a.type === 'link' ? a.data : 'File'})`).join(', ')
+                : 'None';
+
+            container.innerHTML = `
+                <div class="print-header">
+                    <h1 class="text-4xl font-black text-slate-900">Task Detailed Report</h1>
+                    <p class="text-slate-500 font-bold uppercase tracking-widest text-xs mt-2">Ref #${r.id} • ${new Date().toLocaleString()}</p>
+                </div>
+                <table class="print-table">
+                    <tbody>
+                        <tr><th width="30%">Objective</th><td class="font-bold">${r.title}</td></tr>
+                        <tr><th>Stream</th><td>${r.category}</td></tr>
+                        <tr><th>Intensity</th><td class="uppercase font-bold">${r.priority}</td></tr>
+                        <tr><th>Context</th><td>${r.description || 'N/A'}</td></tr>
+                        <tr><th>Scheduled</th><td class="font-bold">${new Date(r.time).toLocaleString()}</td></tr>
+                        <tr><th>Status</th><td>${r.completed ? 'ACCOMPLISHED' : 'PENDING'}</td></tr>
+                        <tr><th>Attachments</th><td>${attachmentsList}</td></tr>
+                    </tbody>
+                </table>
+            `;
+            window.print();
+        }
+
+        window.printFullReport = function() {
+            const dataToPrint = getAnalyticsData();
+            const container = document.getElementById('printContainer');
+            
+            container.innerHTML = `
+                <div class="print-header">
+                    <h1 class="text-4xl font-black text-slate-900">System Analytical Report</h1>
+                    <p class="text-slate-500 font-bold uppercase tracking-widest text-xs mt-2">Remindly Intelligence Node • ${new Date().toLocaleString()}</p>
+                </div>
+                <div class="mb-8 flex gap-12">
+                    <div><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</p><p class="text-3xl font-black">${dataToPrint.length}</p></div>
+                    <div><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Success</p><p class="text-3xl font-black text-emerald-600">${dataToPrint.filter(r => r.completed).length}</p></div>
+                </div>
+                <table class="print-table">
+                    <thead>
+                        <tr>
+                            <th width="20%">Objective</th>
+                            <th>Category</th>
+                            <th>Intensity</th>
+                            <th width="30%">Context</th>
+                            <th>Timeline</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${dataToPrint.map(r => `
+                            <tr>
+                                <td class="font-bold">${r.title}</td>
+                                <td>${r.category}</td>
+                                <td class="uppercase">${r.priority}</td>
+                                <td class="text-sm text-gray-600 italic">${r.description || 'N/A'}</td>
+                                <td>${new Date(r.time).toLocaleDateString()}</td>
+                                <td class="font-bold uppercase">${r.completed ? 'DONE' : 'OPEN'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            window.print();
+        }
+
+        function getPriorityGradient(p) {
+            switch(p) {
+                case 'high': return 'from-rose-500 to-pink-600';
+                case 'medium': return 'from-amber-400 to-orange-500';
+                case 'low': return 'from-emerald-400 to-teal-500';
+                default: return 'from-slate-400 to-slate-500';
+            }
+        }
+
+        function getCategoryColor(c) {
+            switch(c) {
+                case 'Work': return 'bg-violet-100 text-violet-600';
+                case 'Health': return 'bg-rose-100 text-rose-600';
+                case 'Finance': return 'bg-emerald-100 text-emerald-600';
+                case 'Personal': return 'bg-sky-100 text-sky-600';
+                default: return 'bg-slate-100 text-slate-600';
+            }
+        }
+
+        function checkUpcomingReminders() {
+            const now = new Date();
+            reminders.forEach(r => {
+                if (!r.completed && r.alertDays && r.alertDays > 0) { 
+                    const due = new Date(r.time);
+                    const diffTime = due - now;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays === r.alertDays) {
+                        setTimeout(() => {
+                            notify(`📅 Heads Up: "${r.title}" is due in ${diffDays} days!`);
+                        }, 1000);
+                    }
+                }
+            });
+        }
+
+        function render() {
+            const list = document.getElementById('remindersList');
+            const analyticsBody = document.getElementById('analyticsBody');
+            
+            document.getElementById('statActive').innerText = reminders.filter(r => !r.completed).length;
+            document.getElementById('statCompleted').innerText = reminders.filter(r => r.completed).length;
+            document.getElementById('statPending').innerText = reminders.filter(r => new Date(r.time) < new Date() && !r.completed).length;
+            document.getElementById('statTotal').innerText = reminders.length;
+
+            const filtered = reminders.filter(r => {
+                if (filterStatus === 'pending') return !r.completed;
+                if (filterStatus === 'completed') return r.completed;
+                return true;
+            }).filter(r => 
+                r.title.toLowerCase().includes(searchQuery) || 
+                r.description.toLowerCase().includes(searchQuery)
+            ).sort((a, b) => new Date(a.time) - new Date(b.time));
+
+            list.innerHTML = filtered.map(r => {
+                const now = new Date();
+                const due = new Date(r.time);
+                const diffTime = due - now;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const isUrgent = !r.completed && r.alertDays > 0 && diffDays >= 0 && diffDays <= r.alertDays;
+
+                return `
+                <div class="group relative glass rounded-[2rem] p-5 border-2 transition-all hover:bg-white/70 ${r.completed ? 'opacity-60 border-white/40' : (isUrgent ? 'border-amber-400/60 shadow-xl shadow-amber-100/50' : 'border-white hover:border-violet-200')}">
+                    ${isUrgent ? `
+                        <div class="absolute -top-2 left-6 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-black px-2 py-1 rounded-b-lg shadow-sm flex items-center gap-1 animate-pulse z-10">
+                            <i data-lucide="alert-triangle" class="w-3 h-3"></i>
+                            <span>Due in ${diffDays} Days</span>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                        <button onclick="toggleComplete('${r.id}')" class="h-12 w-12 md:h-14 md:w-14 rounded-[1.2rem] border-2 flex items-center justify-center transition-all flex-shrink-0 ${r.completed ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'bg-white/60 border-slate-100 text-slate-200 hover:border-violet-400 hover:text-violet-500'}">
+                            <i data-lucide="check" class="w-6 h-6 stroke-[3]"></i>
+                        </button>
+
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                                <span class="px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter ${getCategoryColor(r.category)}">${r.category}</span>
+                                <div class="px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase bg-gradient-to-r text-white shadow-sm ${getPriorityGradient(r.priority)}">${r.priority}</div>
+                                ${r.alertDays > 0 ? `<div class="flex items-center gap-1 text-violet-400 ml-1" title="${r.alertDays}d Alert"><i data-lucide="bell-ring" class="w-3 h-3"></i></div>` : ''}
+                            </div>
+                            <h3 class="text-lg md:text-xl font-black leading-tight tracking-tight truncate ${r.completed ? 'line-through text-slate-400' : 'text-slate-900'}">${r.title}</h3>
+                            <p class="text-xs md:text-sm text-slate-500 font-medium truncate mt-0.5">${r.description || ''}</p>
+                            
+                            ${r.attachments && r.attachments.length > 0 ? `
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    ${r.attachments.map(att => {
+                                        const isLink = att.type === 'link';
+                                        return `
+                                        <div class="flex items-center gap-1.5 ${isLink ? 'bg-indigo-50 border-indigo-100 text-indigo-700' : 'bg-violet-50 border-violet-100 text-violet-700'} border px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer hover:opacity-80 transition-opacity" onclick="viewAttachment('${att.id}', false)">
+                                            <i data-lucide="${isLink ? 'link' : 'paperclip'}" class="w-3 h-3"></i>
+                                            <span class="truncate max-w-[80px]">${att.name}</span>
+                                            ${!isLink ? `<a href="${att.data}" download="${att.name}" onclick="event.stopPropagation()" class="ml-1 hover:text-emerald-500"><i data-lucide="download" class="w-3 h-3"></i></a>` : ''}
+                                        </div>
+                                    `}).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <div class="flex flex-row md:flex-col items-center md:items-end gap-3 md:gap-2 justify-between md:justify-center border-t md:border-t-0 border-slate-100 pt-3 md:pt-0 w-full md:w-auto">
+                            <div class="flex items-center gap-2 text-slate-400 bg-white/50 px-3 py-1.5 rounded-xl">
+                                <i data-lucide="calendar" class="w-3 h-3 text-violet-500"></i>
+                                <span class="text-[10px] font-bold uppercase tracking-widest">${new Date(r.time).toLocaleDateString([], {month:'short', day:'numeric'})}</span>
+                                <span class="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-300 border-l border-slate-200 pl-2">${new Date(r.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                            </div>
+                            
+                            <div class="flex gap-1">
+                                ${r.whatsapp ? `<button onclick="sendWhatsapp('${r.id}')" class="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors" title="WhatsApp"><i data-lucide="message-circle" class="w-4 h-4"></i></button>` : ''}
+                                <button onclick="openRenewModal('${r.id}')" class="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+                                <button onclick="openModal('${r.id}')" class="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                                <button onclick="printSingle('${r.id}')" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><i data-lucide="printer" class="w-4 h-4"></i></button>
+                                <button onclick="deleteTask('${r.id}')" class="p-2 text-rose-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `}).join('');
+
+            const analyticsData = getAnalyticsData();
+            analyticsBody.innerHTML = analyticsData.map(r => `
+                <tr class="group hover:bg-violet-50/40 transition-colors">
+                    <td class="py-6 px-4">
+                        <p class="font-black text-slate-900 text-sm truncate max-w-[180px]">${r.title}</p>
+                        <p class="text-[10px] text-slate-400 font-bold mt-0.5 uppercase">ID: ${r.id}</p>
+                    </td>
+                    <td class="py-6 px-4">
+                        <span class="px-3 py-1 rounded-lg text-[9px] font-black uppercase ${getCategoryColor(r.category)}">${r.category}</span>
+                    </td>
+                    <td class="py-6 px-4 text-center">
+                        <div class="inline-block px-3 py-1 rounded-lg text-[9px] font-black uppercase bg-gradient-to-r text-white ${getPriorityGradient(r.priority)}">${r.priority}</div>
+                    </td>
+                    <td class="py-6 px-4 text-xs font-bold text-slate-600 font-mono">${new Date(r.time).toLocaleDateString()}</td>
+                    <td class="py-6 px-4 text-right">
+                        <span class="text-[10px] font-black uppercase tracking-widest ${r.completed ? 'text-emerald-500' : 'text-orange-500'}">
+                            ${r.completed ? 'Success' : 'Active'}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
